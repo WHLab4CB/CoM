@@ -1,0 +1,98 @@
+structure               CoM/chignolin/toppar/step3_input.psf
+coordinates             CoM/chignolin/toppar/step3_input.pdb
+bincoordinates          ../sample_cell.coor
+extendedSystem          ../sample_cell.xsc
+
+set temp                340;
+outputName              run_traj;        
+firsttimestep           0;                  
+
+
+temperature             $temp;
+
+binaryrestart           yes;
+restartfreq             100000;    
+restartsave             no;
+
+dcdfreq                 5000;
+dcdUnitCell             yes;                
+                                                                                        
+xstFreq                 5000;               
+outputEnergies          1000;               
+
+# Force-Field Parameters
+paraTypeCharmm          on;                 
+                                            
+parameters              CoM/chignolin/toppar/par_all36_prot.prm
+parameters              CoM/chignolin/toppar/par_all36_na.prm
+parameters              CoM/chignolin/toppar/par_all36_carb.prm
+parameters              CoM/chignolin/toppar/par_all36_lipid.prm
+parameters              CoM/chignolin/toppar/par_all36_cgenff.prm
+parameters              CoM/chignolin/toppar/toppar_water_ions.str
+parameters              CoM/chignolin/toppar/toppar_ions_won.str
+
+# Nonbonded Parameters
+exclude                 scaled1-4           # non-bonded exclusion policy to use "none,1-2,1-3,1-4,or scaled1-4"
+                                            # 1-2: all atoms pairs that are bonded are going to be ignored
+                                            # 1-3: 3 consecutively bonded are excluded
+                                            # scaled1-4: include all the 1-3, and modified 1-4 interactions
+                                            # electrostatic scaled by 1-4scaling factor 1.0
+                                            # vdW special 1-4 parameters in charmm parameter file.
+1-4scaling              1.0
+switching               on
+vdwForceSwitching       on;                 # New option for force-based switching of vdW
+                                            # if both switching and vdwForceSwitching are on CHARMM force
+                                            # switching is used for vdW forces.
+
+# You have some freedom choosing the cutoff
+cutoff                  9.5;               # may use smaller, maybe 10., with PME
+switchdist              7.5;               # cutoff - 2.
+                                            # switchdist - where you start to switch
+                                            # cutoff - where you stop accounting for nonbond interactions.
+                                            # correspondence in charmm:
+                                            # (cutnb,ctofnb,ctonnb = pairlistdist,cutoff,switchdist)
+pairlistdist            11.5;               # stores the all the pairs with in the distance it should be larger
+                                            # than cutoff( + 2.)
+stepspercycle           20;                 # 20 redo pairlists every ten steps
+pairlistsPerCycle       2;                  # 2 is the default
+                                            # cycle represents the number of steps between atom reassignments
+                                            # this means every 20/2=10 steps the pairlist will be updated
+
+# Integrator Parameters
+timestep                1.0;                # fs/step
+rigidBonds              all;                # Bound constraint all bonds involving H are fixed in length
+nonbondedFreq           1;                  # nonbonded forces every step
+fullElectFrequency      1;                  # PME every step
+
+
+# Periodic Boundary conditions. Need this since for a start...
+#cellBasisVector1    39.0  0.0    0.0;        # vector to the next image
+#cellBasisVector2    0.0   39.0   0.0;
+#cellBasisVector3    0.0   0.0    39.0;
+#cellOrigin          0.0   0.0    0.0;        # the *center* of the cell
+
+wrapWater               on;                 # wrap water to central cell
+wrapAll                 on;                 # wrap other molecules too
+wrapNearest             off;                # use for non-rectangular cells (wrap to the nearest image)
+
+# PME (for full-system periodic electrostatics)
+PME                     yes;
+PMEInterpOrder          6;                  # interpolation order (spline order 6 in charmm)
+PMEGridSpacing          1.0;                # maximum PME grid space / used to calculate grid size
+
+# Constant Temperature Control
+langevin                on
+langevinDamping         1.0
+langevinTemp            $temp
+langevinHydrogen        off
+
+tclForces               on
+tclForcesScript         ../run_traj.tcl
+
+colvars                 on
+colvarsConfig           ../colvar_run.conf
+
+
+run                3000
+
+

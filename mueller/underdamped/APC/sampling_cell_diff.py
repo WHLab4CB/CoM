@@ -1,0 +1,256 @@
+#!/usr/bin/env python3
+
+import numpy as np
+import math
+import random
+import struct
+from typing import List, Tuple
+import sys
+import copy
+
+
+### output
+f_sampling = open("../data/samples_cell.txt","w")
+f_xt_cell = open("../data/xt_cell.txt","w")
+
+### params
+ank_list = np.loadtxt("./ank.dat")
+xt_list = np.loadtxt("../data/xt_ini.txt",usecols=(0,1,2))
+diff_c_list = np.loadtxt("../data/aver_diff_c_value.txt")
+c_diff_cut = 0.1
+
+n_ank = len(ank_list)
+ank_id = ank_list[:,0]
+x_ank = ank_list[:,1:] 
+
+mass = 1.0
+kBT_sam = 20.0
+kBT = 10.0
+gamma = 10
+dt_sampling = 5e-4
+k_con = 8000.0
+dt = 1e-3
+save_interval = 200
+target_samples = 100
+n_steps = 30
+n_trajectories = 5
+
+reactant_center = np.array([-0.27, 1.73])
+product_center = np.array([0.84, 0.00])
+radius = 0.1
+
+sampling_x_range = (-1.7, 1.2)
+sampling_y_range = (-0.4, 2.1)
+
+
+terms = [
+    {'A': -200.0, 'a': -1.0, 'b': 0.0, 'c': -10.0, 'x0': 1.0, 'y0': 0.0},
+    {'A': -100.0, 'a': -1.0, 'b': 0.0, 'c': -10.0, 'x0': 0.0, 'y0': 0.5},
+    {'A': -170.0, 'a': -6.5, 'b': 11.0, 'c': -6.5, 'x0': -0.5, 'y0': 1.5},
+    {'A':   15.0, 'a':  0.7, 'b': 0.6, 'c':  0.7, 'x0': -1.0, 'y0': 1.0}
+]
+
+def compute_potential(x, y, terms):
+    V = 0.0
+    for term in terms:
+        dx = x - term['x0']
+        dy = y - term['y0']
+        exponent = term['a'] * dx**2 + term['b'] * dx * dy + term['c'] * dy**2
+        V += term['A'] * np.exp(exponent)
+    return V
+
+def compute_gradient(x, y, terms):
+    grad_x, grad_y = 0.0, 0.0
+    for term in terms:
+        dx = x - term['x0']
+        dy = y - term['y0']
+        exponent = term['a'] * dx**2 + term['b'] * dx * dy + term['c'] * dy**2
+        prefactor = term['A'] * np.exp(exponent)
+        grad_x += prefactor * (2 * term['a'] * dx + term['b'] * dy)
+        grad_y += prefactor * (term['b'] * dx + 2 * term['c'] * dy)
+    return grad_x, grad_y
+
+
+def cell_bias_force(x, x_ank, ank1,x_boundary,y_boundary,k_con):
+    ### Calculate bias force for sampling in cells
+    n_ank = len(x_ank)
+    # Calculate distance between this point and initial anchor
+    x_diff0 = x[0] - x_ank[ank1, 0]
+    x_diff1 = x[1] - x_ank[ank1, 1]
+    dx1 = math.sqrt(x_diff0**2 + x_diff1**2)
+    
+    # Calculate bias force and harmonic restraints
+    u2x_bias = [0.0, 0.0]
+    
+    # Harmonic wall restraints
+    for i in range(n_ank):
+        if i == ank1:
+            continue
+            
+        x_diff2 = x[0] - x_ank[i, 0]
+        x_diff3 = x[1] - x_ank[i, 1]
+        dx3 = math.sqrt(x_diff2**2 + x_diff3**2)
+        dx2 = dx1 - dx3
+
+        if dx2 > 0.0:
+            u2x_bias[0] += 2.0 * k_con * dx2 * (x_diff0 / dx1 - x_diff2 / dx3)
+            u2x_bias[1] += 2.0 * k_con * dx2 * (x_diff1 / dx1 - x_diff3 / dx3)
+    
+    # Harmonic wall restraints in boundaries
+    if (x[0] <= x_boundary[0]):
+        u2x_bias[0] += k_con*(x[0]-x_boundary[0])
+    if (x[0] >= x_boundary[1]):
+        u2x_bias[0] += k_con*(x[0]-x_boundary[1])
+
+    if (x[1] <= y_boundary[0]):
+        u2x_bias[1] += k_con*(x[1]-y_boundary[0])
+    if (x[1] >= y_boundary[1]):
+        u2x_bias[1] += k_con*(x[1]-y_boundary[1])
+
+    return u2x_bias
+
+def in_reactant(x, y):
+    dx = x - reactant_center[0]
+    dy = y - reactant_center[1]
+    return dx**2 + dy**2 <= radius**2
+
+def in_product(x, y):
+    dx = x - product_center[0]
+    dy = y - product_center[1]
+    return dx**2 + dy**2 <= radius**2
+
+def run_sampling_cell(x_ank, initial_pos, this_ank, mass, kBT_sam, dt, gamma, save_interval, target_samples, x_boundary, y_boundary):
+    current_pos = np.array(initial_pos, dtype=np.float64)
+    v = np.zeros(2)
+    v += np.sqrt(kBT_sam/mass)*np.random.randn(2)
+    noise_std = np.sqrt(2.0*gamma*kBT_sam*dt)/mass
+    x_sampling = []
+    for step in range(200000):
+        grad_x, grad_y = compute_gradient(*current_pos, terms)
+        u2x_bias = cell_bias_force(current_pos,x_ank,this_ank,x_boundary,y_boundary,k_con)
+        #xt_old = current_pos.copy()
+
+        current_pos[0] += v[0]*dt
+        current_pos[1] += v[1]*dt
+        v[0] += -gamma*dt/mass*v[0] - (grad_x + u2x_bias[0])/mass*dt + np.random.normal(0, noise_std)
+        v[1] += -gamma*dt/mass*v[1] - (grad_y + u2x_bias[1])/mass*dt + np.random.normal(0, noise_std)
+        
+            
+        if (step+1) % save_interval == 0:
+            x_sampling.append(current_pos.copy())
+        if len(x_sampling) >= target_samples:
+            break
+    return x_sampling
+
+def run_trajectory(initial_pos, mass, kBT, gamma, dt, n_steps, terms):
+    current_pos = np.array(initial_pos, dtype=np.float64)
+    if in_reactant(*current_pos) or in_product(*current_pos):
+        return current_pos.tolist()
+    v = np.zeros(2)
+    v += np.sqrt(kBT/mass)*np.random.randn(2)
+    noise_std = np.sqrt(2.0*gamma*kBT*dt)/mass
+    for _ in range(n_steps):
+        grad_x, grad_y = compute_gradient(*current_pos, terms)
+        current_pos[0] += v[0]*dt
+        current_pos[1] += v[1]*dt
+        v[0] += -gamma*dt/mass*v[0] - grad_x/mass*dt + np.random.normal(0, noise_std)
+        v[1] += -gamma*dt/mass*v[1] - grad_y/mass*dt + np.random.normal(0, noise_std)
+        if in_reactant(*current_pos) or in_product(*current_pos):
+            break
+    return current_pos.tolist()
+
+def which_near(x_ank, xt):
+    ### Determine which anchor is nearest
+    n_ank = len(x_ank)
+    near_ank = -9999
+    dr_min = 0.0
+    
+    for i in range(n_ank):
+        dx2 = math.sqrt((xt[0] - x_ank[i, 0])**2 + (xt[1] - x_ank[i, 1])**2)
+        if i == 0:
+            dr_min = dx2
+            near_ank = i
+        else:
+            if dx2 < dr_min:
+                dr_min = dx2
+                near_ank = i              
+    return int(near_ank)
+
+### run
+cell_list = []
+for i in range(len(diff_c_list)):
+    if diff_c_list[i][1] > c_diff_cut:
+        cell_list.append(int(diff_c_list[i][0])) 
+print("Updata cell points:")
+print(cell_list)
+
+xt_sampleing_list = []
+initial_configs = []
+for i in cell_list:
+    for j in range(len(xt_list)):
+        if i == xt_list[j][0]:
+            xt = xt_list[j][1:]
+            break
+    ini_ank1 = i
+    this_ank = which_near(x_ank, xt)
+    if this_ank != ini_ank1:
+        print("Warning: initial position not in target anchor!")
+    
+    sampling_list = run_sampling_cell(x_ank, xt, ini_ank1, mass, kBT_sam, dt_sampling, gamma, save_interval, target_samples, sampling_x_range, sampling_y_range)
+    this_ank = which_near(x_ank, sampling_list[-1])
+    
+    if this_ank == ini_ank1:
+        xt_sampleing_list.append([this_ank,sampling_list[-1][0],sampling_list[-1][1]])
+
+    else:
+        xt_pos = np.array(sampling_list[-1], dtype=np.float64)
+        v = np.zeros(2)
+        v += np.sqrt(kBT_sam/mass)*np.random.randn(2)
+        noise_std = np.sqrt(2.0*gamma*kBT_sam*dt)/mass
+        for step in range(200000):
+            grad_x, grad_y = compute_gradient(*xt_pos, terms)
+            u2x_bias = cell_bias_force(xt_pos,x_ank,this_ank,sampling_x_range,sampling_y_range,k_con)
+
+            xt_pos[0] += v[0]*dt
+            xt_pos[1] += v[1]*dt
+            v[0] += -gamma*dt/mass*v[0] - (grad_x + u2x_bias[0])/mass*dt + np.random.normal(0, noise_std)
+            v[1] += -gamma*dt/mass*v[1] - (grad_y + u2x_bias[1])/mass*dt + np.random.normal(0, noise_std)
+            this_ank = which_near(x_ank, xt_pos)
+            if this_ank == ini_ank1:
+                this_xt = xt_pos.copy()
+                break
+        xt_sampleing_list.append([this_ank,this_xt[0],this_xt[1]])
+    #print(f'{this_ank:.0f} {sampling_list[-1][0]:.6f} {sampling_list[-1][1]:.6f}',file=f_xt_cell)
+    
+    ### without E_cut
+    for j in range(len(sampling_list)):
+        initial_configs.append((sampling_list[j][0], sampling_list[j][1]))
+        this_ank = which_near(x_ank, sampling_list[j])
+        print(f'{ini_ank1:.0f} {sampling_list[j][0]:.6f} {sampling_list[j][1]:.6f} {this_ank:.0f}',file=f_sampling)
+
+### updata xt_list
+new_xt_list = copy.deepcopy(xt_list)
+for i in range(len(xt_sampleing_list)):
+    for j in range(len(xt_list)):
+        if xt_sampleing_list[i][0] == xt_list[j][0]:
+            new_xt_list[j][1] = xt_sampleing_list[i][1]
+            new_xt_list[j][2] = xt_sampleing_list[i][2]
+            break
+
+for i in range(len(new_xt_list)):
+    print(f"{new_xt_list[i][0]:.0f} {new_xt_list[i][1]:.6f} {new_xt_list[i][2]:.6f}",file=f_xt_cell)
+
+
+with open('../data/trajectories.txt', 'w') as f:
+    for init in initial_configs:
+        endpoints = []
+        for _ in range(n_trajectories):
+            endpoint = run_trajectory(init, mass, kBT, gamma, dt, n_steps, terms)
+            endpoints.extend(endpoint)
+        line = [f"{coord:.6f}" for coord in list(init) + endpoints]
+        f.write(' '.join(line) + '\n')
+
+if len(cell_list) == 0:
+    sys.exit(1)
+else:
+    sys.exit(0)

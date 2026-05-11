@@ -1,0 +1,76 @@
+#############################################################
+## JOB DESCRIPTION                                         ##
+#############################################################
+
+# simulation (stretching) of alad in vacuum
+# Constant temperature
+# Charmm22 force field
+
+#############################################################
+## ADJUSTABLE PARAMETERS                                   ##
+#############################################################
+
+structure          ../Aladipep.psf
+coordinates        ../Aladipep.pdb
+bincoordinates     ../sample_cell.coor
+#binvelocities      ../sample_cell.vel
+
+outputName         run_traj
+
+set temperature    400
+
+binaryrestart  yes
+restartfreq    20000
+restartsave    no
+
+
+
+#############################################################
+## SIMULATION PARAMETERS                                   ##
+#############################################################
+
+# Input
+paraTypeCharmm	    on
+parameters          ../par_all22_prot_nocmap.prm
+temperature         $temperature
+ 
+# Force-Field Parameters
+exclude             scaled1-4
+1-4scaling          1.0
+cutoff              30.0
+switching           on
+vdwForceSwitching   on
+switchdist          28.0
+pairlistdist        32.0
+
+# Integrator Parameters
+timestep            1.0  ;# 1fs/step
+rigidBonds          all  ;# needed for 1fs steps
+nonbondedFreq	    1
+fullElectFrequency  1  
+stepspercycle       20
+pairlistsPerCycle   2
+
+# Constant Temperature Control
+langevin            on    ;# do langevin dynamics
+langevinDamping     1     ;# damping coefficient (gamma) of 1/ps
+langevinTemp        $temperature
+langevinHydrogen    no    ;# don't couple langevin bath to hydrogens
+
+# Output
+binaryoutput        yes
+dcdfreq             20000     ;# 1000steps = every 1ps
+outputEnergies      100
+
+#############################################################
+## EXTRA PARAMETERS                                        ##
+#############################################################
+
+# Tcl interface
+tclForces           on
+tclForcesScript    ../run_traj.tcl
+
+colvars    on
+colvarsConfig   ../colvar_run.conf
+
+run 300

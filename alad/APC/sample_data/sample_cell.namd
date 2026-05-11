@@ -1,0 +1,78 @@
+#############################################################
+## JOB DESCRIPTION                                         ##
+#############################################################
+
+# simulation (stretching) of alad in vacuum
+# Constant temperature
+# Charmm22 force field
+
+#############################################################
+## ADJUSTABLE PARAMETERS                                   ##
+#############################################################
+
+structure          Aladipep.psf
+coordinates        Aladipep.pdb
+
+bincoordinates     ini.coor
+
+outputName         sample_cell
+
+set temperature    600
+
+binaryrestart  yes
+restartfreq    400
+restartsave    yes
+
+
+
+#############################################################
+## SIMULATION PARAMETERS                                   ##
+#############################################################
+
+# Input
+paraTypeCharmm	    on
+parameters          par_all22_prot_nocmap.prm
+temperature         $temperature
+ 
+# Force-Field Parameters
+exclude             scaled1-4
+1-4scaling          1.0
+cutoff              30.0
+switching           on
+vdwForceSwitching   on
+switchdist          28.0
+pairlistdist        32.0
+
+# Integrator Parameters
+timestep            0.5  ;# 1fs/step
+rigidBonds          all  ;# needed for 1fs steps
+nonbondedFreq	    1
+fullElectFrequency  1  
+stepspercycle       20
+pairlistsPerCycle   2
+
+# Constant Temperature Control
+langevin            on    ;# do langevin dynamics
+langevinDamping     1     ;# damping coefficient (gamma) of 1/ps
+langevinTemp        $temperature
+langevinHydrogen    no    ;# don't couple langevin bath to hydrogens
+
+# Output
+binaryoutput        yes
+dcdfreq             20000     ;# 1000steps = every 1ps
+outputEnergies      1000
+
+#############################################################
+## EXTRA PARAMETERS                                        ##
+#############################################################
+
+# Tcl interface
+#tclForces           on
+#tclForcesScript     sampling.tcl
+
+colvars    on
+colvarsConfig   colvar_sample_cell.conf
+
+source ./sample_cell.tcl
+
+run 40000
