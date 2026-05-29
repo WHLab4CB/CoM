@@ -87,10 +87,10 @@ langevinTemp            $temp
 langevinHydrogen        off
 
 tclForces               on
-tclForcesScript         ./shooting.tcl
+tclForcesScript         ../shooting.tcl
 
 colvars                 on
-colvarsConfig           ./colvar_shooting.conf
+colvarsConfig           ../colvar_shooting.conf
 
 
 run                1000000000

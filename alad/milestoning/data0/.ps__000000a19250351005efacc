@@ -1,0 +1,40 @@
+#!/usr/bin/bash
+
+#SBATCH -J sample_mile
+#SBATCH -p xahcnormal
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=1
+
+currend_dir="$HOME/test/committor_ml/test_alad/test_0/milestoning"
+sample_dir="$HOME/test/committor_ml/test_alad/test_0/sample_mile"
+
+i_start=0
+i_final=1
+n_traj=10
+for ((i=$i_start; i < $i_final; i++))
+do
+    for ((j=0; j<$n_traj; j++))
+    do
+        let "this_i=2000+2000*j"
+        mkdir -p $currend_dir/mile_$i/traj_$j
+        cd $currend_dir/data0/
+        python3 rewrite_tcl.py $i
+        cd ../
+        cp  $currend_dir/data0/shooting.namd  $currend_dir/mile_$i/traj_$j
+        cp  $currend_dir/data0/colvar_shooting.conf  $currend_dir/mile_$i/traj_$j
+        cp  $currend_dir/data0/shooting.tcl  $currend_dir/milestoning/mile_$i/traj_$j
+        cp $currend_dir/data0/committor.tcl  $currend_dir/milestoning/mile_$i/traj_$j
+        cp $currend_dir/data0/network_params.tcl  $currend_dir/milestoning/mile_$i/traj_$j
+
+        cp $sample_dir/mile_$i/sample_mile.$this_i.coor $currend_dir/mile_$i/traj_$j/sample_mile.coor
+        cp $sample_dir/mile_$i/sample_mile.$this_i.vel /$currend_dir/mile_$i/traj_$j/sample_mile.vel
+
+        cp $currend_dir/data0/sub.slurm $currend_dir/mile_$i/
+    
+    done
+    cd $currend_dir/mile_$i
+    sbatch sub.slurm
+
+done
+
+
