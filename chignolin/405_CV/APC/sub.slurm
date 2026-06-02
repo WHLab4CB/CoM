@@ -10,9 +10,36 @@ current_dir="CoM/chignolin/405_CV/APC"
 
 n_ank=27
 i=0
-#j=0
 n_points=100
 n_traj=5
+
+if [ $i -eq 0 ] || [ $i -eq 1 ]; then
+    cells_to_process=()
+    for ((tmp_j=0; tmp_j<$n_ank; tmp_j++)); do
+        cells_to_process+=($tmp_j)
+    done
+else
+    prev_i=$((i-1))
+    ana_file="$current_dir/run_traj_${prev_i}/ana_data/aver_diff_c_value.txt"
+    
+    if [ -f "$ana_file" ]; then
+        cells_to_process=()
+        while read -r col1 col2 rest; do
+            if (( $(echo "$col2 > 0.1" | bc -l) )); then
+                cells_to_process+=($col1)
+            fi
+        done < "$ana_file"
+        echo "Processing cells: ${cells_to_process[@]}"
+    else
+        echo "Warning: Analysis file $ana_file not found, program terminated"
+        exit 1
+    fi
+fi
+
+declare -A process_cell
+for cell in "${cells_to_process[@]}"; do
+    process_cell[$cell]=1
+done
 
 
 for ((j=0; j<$n_ank; j++))
@@ -32,6 +59,14 @@ do
         cp $current_dir/sample_ini/cell_$j/colvar_sample_cell.conf $current_dir/sample_$i/cell_$j/
     fi
 
+    if [ -z "${process_cell[$j]}" ]; then
+        cp $current_dir/sample_$i/cell_$j/ini.coor $current_dir/sample_$i/cell_$j/sample_cell.coor
+        cp $current_dir/sample_$i/cell_$j/ini.vel $current_dir/sample_$i/cell_$j/sample_cell.vel
+        cp $current_dir/sample_$i/cell_$j/ini.xsc $current_dir/sample_$i/cell_$j/sample_cell.xsc
+        echo "Skipping cell_$j (not in processing list)"
+        continue
+    fi
+    
     cd $current_dir/sample_$i/cell_$j/
     charmrun namd2 +auto-provision +isomalloc_sync sample_cell.namd >& sample_cell.log
     cat sample_cell.log | grep final_result > sample_cell.out
@@ -68,17 +103,18 @@ done
 
 ###analysis
 mkdir -p $current_dir/run_traj_$i/ana_data
-cp $current_dir/ana_py/ank.txt $current_dir/run_traj_$i/ana_data/
+cp $current_dir/ana_py/ank.txt $current_dir/run_traj_$i/ana_data
 cd $current_dir/run_traj_$i/ana_data
 python3 ../../ana_py/new_result.py $i
 if [ $i -eq 0 ]; then
     cp ./run_traj.out ./run_traj_all.out
 else
-    cat ../../run_traj_$i_1/ana_data/run_traj_all.out ./run_traj.out > ./run_traj_all.out
+    let "i_1=i-1"
+    cat ../../run_traj_${i_1}/ana_data/run_traj_all.out ./run_traj.out > ./run_traj_all.out
 fi
 python3 ../../ana_py/analog2.py ./run_traj_all.out
 if [ $i -ne 0 ]; then
-    python3 ../../ana_py/diff_C_values_cell_new.py ../../run_traj_$i_1/ana_data/C_values.dat ./C_values.dat
+    python3 ../../ana_py/diff_C_values_cell_new.py ../../run_traj_${i_1}/ana_data/C_values.dat ./C_values.dat
 fi
 
 

@@ -22,7 +22,7 @@ if i_cycle < 2:
     print(cell_list)
 
 else:
-    diff_c_list = np.loadtxt("../../run_traj_"+str(int(i_cycle-1))+"/data0/aver_diff_c_value.txt")
+    diff_c_list = np.loadtxt("../../run_traj_"+str(int(i_cycle-1))+"/ana_data/aver_diff_c_value.txt")
     cell_list = []
     for i in range(len(diff_c_list)):
         if diff_c_list[i][1] > c_diff_cut:
