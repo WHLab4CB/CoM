@@ -40,7 +40,7 @@ Finally, committor values are estimated for all $\square$ points based on a disc
 
 Running ./APC/sub.slurm executes the above three steps automatically. 
 
-Neural network training (nn/): At the end of the APC algorithm, a neural network is trained based on these computed committor values on $\square$ poitns to obtain a smooth representation of the committor. 
+Neural network training (nn/): At the end of the APC algorithm, a neural network is trained based on these computed committor values on $\square$ points to obtain a smooth representation of the committor. 
 
 Milestoning analysis (milestoning/): Performing Milestoning simulations and analysis. 
 
@@ -62,7 +62,7 @@ Step5: sbatch ./sub.slurm   ### demo output files are provided: ../demo-output/A
 
 Step6: manually inspect the file ./APC/run_traj_$i/ana_data/aver_diff_c_values.txt to determine whether the predicted committor values have converged (i.e., all elements in the second column of aver_diff_c_values.txt are below 0.1)
 
-Step7: repeat Steps 4-6 (remember the manually change 'i=$i' in Step 4) until the predicted committor values converge
+Step7: repeat Steps 4-6 (remember to manually change 'i=$i' in Step 4) until the predicted committor values converge
 
 
 nn
