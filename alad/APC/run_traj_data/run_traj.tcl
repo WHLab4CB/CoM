@@ -13,7 +13,7 @@ set n_step 300
 proc cal_dist {colvar_phi colvar_psi center_phi center_psi} {
     set dist_phi [expr {$colvar_phi-$center_phi}]
     set dist_psi [expr {$colvar_psi-$center_psi}]
-    set dist_0 [expr {$dist_phi*$dist_phi+$dist_psi*$dist_psi}]
+    set dist_0 [expr {sqrt($dist_phi*$dist_phi+$dist_psi*$dist_psi)}]
     return $dist_0
 }
 

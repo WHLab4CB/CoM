@@ -11,6 +11,7 @@ The following folders contain the code, simulation setup, and models for the thr
 ├── chignolin/             
 │   ├── 405_CV
 │   └── 4_CV
+├── ben-try/
 └── README.md
 ```
 
@@ -22,11 +23,11 @@ The mueller potential calculations are completely self‑contained in Python.
 Running ./mueller/overdamped/sub.sh or ./mueller/underdamped/sub.sh executes the entire pipeline automatically.
 
 
-Alad & Chignolin (NAMD)
+Alad, Chignolin, and Benzamidine-Trypsin (NAMD)
 
 NAMD 2.14 – compiled with TCL support.
 
-All necessary CHARMM force field parameters and topology files are provided in ./alad/data0/ or ./chignolin/toppar/
+All necessary CHARMM force field parameters and topology files are provided in ./alad/data0/, ./chignolin/toppar/, or ./ben-try/toppar/
 
 
 
@@ -52,7 +53,7 @@ APC
 
 Step1: cd ./APC/
 
-Step2: manually change the relevant paths in ./APC/sample_data/sample_cell.namd, ./APC/run_traj_data/run_traj.namd files, and sub.slurm ('current_dir=CoM/alad/APC', 'current_dir=CoM/chignolin/4_CV/APC', or 'current_dir=CoM/chignolin/405_CV/APC') to proper ones.
+Step2: manually change the relevant paths in ./APC/sample_data/sample_cell.namd, ./APC/run_traj_data/run_traj.namd files, and sub.slurm ('current_dir=CoM/alad/APC', 'current_dir=CoM/chignolin/4_CV/APC', 'current_dir=CoM/chignolin/405_CV/APC', or 'current_dir=CoM/ben-try/APC') to proper ones.
 
 Step3: sbatch ./sub.slurm   ### note that the 'i=0' parameter in sub.slurm only runs for the 0-th iteration & demo output files are provided: ../demo-output/APC/run_traj_all.out and ../demo-output/APC/C_values.dat  
 
